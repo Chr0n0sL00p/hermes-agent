@@ -1,7 +1,7 @@
 # Debian 13 still ships SQLite 3.46.1, which contains the upstream WAL-reset
 # corruption bug. Build a pinned shared library for the runtime image instead
 # of relying on a distro backport that trixie does not currently provide.
-# See #70480 and https://sqlite.org/wal.html#walresetbug.
+# See #70480 and https://sqlite.org/wal.html#walresetbug
 FROM debian:13.4 AS sqlite_build
 ARG SQLITE_AUTOCONF_VERSION=3530400
 ARG SQLITE_SHA256=0e9483900e92cd5de8fd48d16bf9200145a61f7fd5be542a5ac81d8a9516eb9c
@@ -190,7 +190,7 @@ COPY apps/shared/ apps/shared/
 # explicitly anyway as defense-in-depth: the previous Debian-bundled npm
 # 9.x defaulted to install-as-copy, which produced a hidden
 # node_modules/.package-lock.json that permanently disagreed with the root
-# lock on the @hermes/ink entry, tripped the TUI launcher's
+# lock on the @file:hermes/ink entry, tripped the TUI launcher's
 # `_tui_need_npm_install()` check on every startup, and triggered a
 # runtime `npm install` that then failed with EACCES.  Keeping the env
 # guards against a future regression if the source npm version changes.
@@ -300,11 +300,11 @@ RUN mkdir -p /opt/hermes/bin && \
     cp /opt/hermes/docker/hermes-exec-shim.sh /opt/hermes/bin/hermes && \
     chmod 0755 /opt/hermes /opt/hermes/bin/hermes && \
     printf 'docker\n' > /opt/hermes/.install_method
-# The ``.install_method`` stamp is baked next to the running code (the install
+# The `.install_method` stamp is baked next to the running code (the install
 # tree), NOT into $HERMES_HOME. $HERMES_HOME (/opt/data) is a shared data
 # volume that is commonly bind-mounted from the host and even shared with a
 # host-side Desktop/CLI install; stamping it at boot used to clobber that
-# host install's marker and wrongly block its ``hermes update``. A code-scoped
+# host install's marker and wrongly block its `hermes update`. A code-scoped
 # stamp is read first by detect_install_method() and is immune to the share.
 # Start as root so the s6-overlay stage2 hook can usermod/groupmod and chown
 # the data volume. Each supervised service then drops to the hermes user via
@@ -321,13 +321,13 @@ RUN mkdir -p /opt/hermes/bin && \
 # "(unknown)" and the startup banner drops its `· upstream <sha>` suffix.
 # That makes support triage from container bug reports impossible:
 # we can't tell which commit the user is actually running.
-#
+# 
 # Fix: write the commit SHA passed via the HERMES_GIT_SHA build-arg to
 # /opt/hermes/.hermes_build_sha at build time, and have
 # hermes_cli/build_info.py read it at runtime.  Both `hermes dump` and
 # banner.get_git_banner_state() try the baked SHA first, then fall back
 # to live `git rev-parse` for source installs (unchanged behaviour).
-#
+# 
 # The arg is optional — local `docker build` without --build-arg omits the
 # SHA file (and records a null provenance revision), so build-info falls back
 # to live-git lookup.  CI
@@ -429,6 +429,13 @@ ENV PATH="/opt/hermes/bin:/opt/hermes/.venv/bin:/opt/data/.local/bin:${PATH}"
 RUN mkdir -p /opt/data
 VOLUME [ "/opt/data" ]
 
+# ---------- Render Free Tier compatibility ----------
+# Start script that handles Render's requirement for an open HTTP port.
+# The gateway runs in background (for Telegram), and a minimal HTTP server
+# provides the port that Render's health check / port detection expects.
+COPY start.sh /start.sh
+RUN chmod +x /start.sh
+
 # The image ENTRYPOINT is a tiny dispatcher rather than `/init` directly.
 # When the image really owns PID 1 (normal Docker / Podman), the dispatcher
 # execs `/init` and preserves the full s6 supervision tree. When a platform
@@ -462,4 +469,4 @@ VOLUME [ "/opt/data" ]
 # wrapper-as-ENTRYPOINT, leading-dash args like `--version` would be
 # intercepted by /init's POSIX shell.
 ENTRYPOINT [ "/opt/hermes/docker/entrypoint-dispatch.sh" ]
-CMD [ ]
+CMD [ "/start.sh" ]
